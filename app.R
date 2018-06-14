@@ -8,6 +8,14 @@
 #
 
 library(shiny)
+library(shinydashboard)
+library(dplyr)
+library(DT)
+library(ggplot2)
+library(purrr)
+library(reshape)
+
+all_data <- as.data.frame(load(file = "Data/21600-0002-Data.rda"))
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -36,9 +44,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   ### CURE algorithm
-  
-  
-  CURE <- function(data,  # data
+  CURE <- function(dataset,  # data
                    k,     # number clusters (>2)
                    alpha, # factor (0 - 1)
                    p,     # number of partitions (>1)
@@ -47,13 +53,18 @@ server <- function(input, output) {
                    q      # number of clusters that should be found in a partition -> number of clusters equals 1/q of the original partition size (>1)
                    )
   {
-    N <- length(data) # TODO adjust to data
+    N <- length(dataset[[1]]) # TODO adjust to data
+    #View(dataset)
+    print(N)
     Ni <- N/k #TODO evaluate if this function could fit (probably Ni has to be smaller)
     inv_delta <- 1/delta
     sample_size <- f*N + N/Ni * log(inv_delta) + N/Ni * sqrt(log(inv_delta)*log(inv_delta) + 2*f*Ni*log(inv_delta))
+    print(as.integer(sample_size))
     
     # take a random sample of size n from a dataset
-    mysample <- mydata[sample(1:nrow(mydata), 50, replace=FALSE),] 
+    mysample <- dataset[sample(1:nrow(dataset), as.integer(sample_size), replace=FALSE),] 
+    print(length(mysample[[1]]))
+    #View(mysample)
     
     # split sample into p equally sized partitions
     
@@ -64,6 +75,10 @@ server <- function(input, output) {
     # assign remaining points that were not sampled to nearest cluster
     
   }
+  
+  print(typeof(all_data))
+  
+  Clustering <- CURE(da21600.0002, 3, 0.3, 4, 0.2, 0.3, 7)
   
    
    output$distPlot <- renderPlot({
