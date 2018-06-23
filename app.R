@@ -14,8 +14,27 @@ library(DT)
 library(ggplot2)
 library(purrr)
 library(reshape)
+library(prettyR)
+library(parallelDist)
+
+
+
 
 all_data <- as.data.frame(load(file = "Data/21600-0002-Data.rda"))
+
+
+# preprocess factors into numerics
+num_attrib <- length(da21600.0002)
+
+for (i in 1:num_attrib) {
+  if(is.factor(da21600.0002[[i]])){
+    lbls <- sort(levels(da21600.0002[[i]]))
+    lbls <- (sub("^\\([0-9]+\\) +(.+$)", "\\1", lbls))
+    da21600.0002[[i]] <- as.numeric(sub("^\\(0*([0-9]+)\\).+$", "\\1", da21600.0002[[i]]))
+    da21600.0002[[i]] <- add.value.labels(da21600.0002[[i]], lbls)
+  }
+  # TODO some kind of normalization (if enough time for this)
+}
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -79,11 +98,26 @@ server <- function(input, output) {
       partitions[[i]] <- mysample[sampleSet,]
       mysample <- mysample[-sampleSet,]
     }
-    #print(length(mysample[[1]]))
-    #print(length(partitions[[1]][[1]]))
-    #print(length(partitions[[4]][[1]]))
     
     # Cluster points in each partition into N/(pq) clusters
+    ### TODO: do clustering for all partitions, not only for the first one.
+    part_length <- length(partitions[[1]][[1]])
+    df_part <- data.frame(reps = list(part_length), dist = numeric(part_length), closest_cluster = numeric(part_length), stringsAsFactors = FALSE)
+    #dist_mat <- matrix(data = NA, nrow = part_length, ncol = length(partitions[[1]]))
+    for (i in 1:part_length) {
+      df_part$reps[[i]] <- as.vector(partitions[[1]][i,])
+      
+    }
+    dist_mat <- sapply(partitions[[1]], function(x){return(x)})
+    
+    View(dist_mat)
+    d <- parallelDist(dist_mat)
+    # todo check structure of d, to get distances between points
+    
+    
+    #   start with each point as an own cluster 
+    #   compute closest cluster to each cluster
+    #   store in ascending order
     
     # Cluster previously found clusters until k clusters remain
     
@@ -91,9 +125,14 @@ server <- function(input, output) {
     
   }
   
-  print(typeof(all_data))
+  # convert to matrix
+  data_mat  <-  matrix(unlist(da21600.0002), nrow=length(unlist(da21600.0002[1])))
+  # remove first col, which is just an ID
+  data_mat <- data_mat[,-1]
+  df <- as.data.frame(data_mat)
+  df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
-  Clustering <- CURE(da21600.0002, 3, 0.3, 4, 0.2, 0.3, 7)
+  Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
   
    
    output$distPlot <- renderPlot({
