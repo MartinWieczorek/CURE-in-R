@@ -54,7 +54,6 @@ server <- function(input, output) {
                    )
   {
     N <- length(dataset[[1]]) # TODO adjust to data
-    #View(dataset)
     print(N)
     Ni <- N/k #TODO evaluate if this function could fit (probably Ni has to be smaller)
     inv_delta <- 1/delta
@@ -62,11 +61,27 @@ server <- function(input, output) {
     print(as.integer(sample_size))
     
     # take a random sample of size n from a dataset
-    mysample <- dataset[sample(1:nrow(dataset), as.integer(sample_size), replace=FALSE),] 
+    sampleSet <- sample(1:nrow(dataset), as.integer(sample_size), replace=FALSE)
+    mysample <- dataset[sampleSet,] 
     print(length(mysample[[1]]))
-    #View(mysample)
     
     # split sample into p equally sized partitions
+    partitionsSize <- as.integer(length(sampleSet) / p)
+    print(partitionsSize)
+    partitions <- list()
+    for (i in 1:p) {
+      if (i == p ){
+        partitions[[i]] <- mysample
+        mysample <- NULL
+        break()
+      }
+      sampleSet <- sample(1:nrow(mysample), as.integer(partitionsSize), replace=FALSE)
+      partitions[[i]] <- mysample[sampleSet,]
+      mysample <- mysample[-sampleSet,]
+    }
+    #print(length(mysample[[1]]))
+    #print(length(partitions[[1]][[1]]))
+    #print(length(partitions[[4]][[1]]))
     
     # Cluster points in each partition into N/(pq) clusters
     
