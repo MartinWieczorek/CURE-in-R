@@ -85,6 +85,12 @@ server <- function(input, output) {
         currentCluster <- unique(dataset$cluster)[i]
         currentRep <- dataset[dataset$cluster == currentCluster & dataset$rep == TRUE,] # representative points of the current cluster
         
+        #compute closest cluster only if no closest cluster known. For example because the closest cluster was merged recently
+        if(!is.na(currentRep[1, "closest"]))
+        {
+          next
+        }
+        
         pointsNotInCurrentCluster <- dataset[!(dataset$cluster == currentCluster) & dataset$rep == TRUE,]
         
         #use kd-tree to find nearest point for each representative point
@@ -111,16 +117,15 @@ server <- function(input, output) {
       
       #TODO: compute new representative points
       
-      
-      View(dataset)
+    
       
       nClusters <- nrow(table(dataset$cluster)) #update number of current clusters
-      nClusters <- k #remove this later, just for debugging
+     # nClusters <- k #remove this later, just for debugging
     }
     
   
     
-    #View(dataset)
+    View(dataset)
   }
   
   ### CURE algorithm
@@ -194,7 +199,7 @@ server <- function(input, output) {
   df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
   Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
-  CURE_cluster(df, 1)
+  CURE_cluster(df, 5)
    
    output$distPlot <- renderPlot({
       # generate bins based on input$bins from ui.R
