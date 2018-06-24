@@ -84,9 +84,8 @@ server <- function(input, output) {
       {
         currentCluster <- unique(dataset$cluster)[i]
         currentRep <- dataset[dataset$cluster == currentCluster & dataset$rep == TRUE,] # representative points of the current cluster
-      
-        #Klingt im Buch so, aber im Paper nicht.
-        pointsNotInCurrentCluster <- dataset[!(dataset$cluster == currentCluster),]
+        
+        pointsNotInCurrentCluster <- dataset[!(dataset$cluster == currentCluster) & dataset$rep == TRUE,]
         
         #use kd-tree to find nearest point for each representative point
         #TODO not sure if Kd-Tree really is a good idea here. It seems to me that the tree is build anew every time and I didn't find a way to keep it
@@ -106,9 +105,8 @@ server <- function(input, output) {
       #merge the two closest clusters
       clustersToMerge <- dataset[dataset$dist == min(dataset$dist),][1,][names(dataset) %in% c("cluster", "closest")]
       dataset[dataset$cluster == clustersToMerge$closest, "cluster"] <- clustersToMerge$cluster #add points of closest cluster to cluster
-      dataset[dataset$closest == clustersToMerge$closest, "closest"] <- clustersToMerge$cluster #clusters that were closest to the cluster that was merged, are now closest to the new cluster
+      dataset[dataset$closest == clustersToMerge$closest, "closest"] <- NA #invalidate closest cluster of clusters that had the cluster that was merged as closest cluster 
       dataset[dataset$cluster == clustersToMerge$cluster, "closest"] <- NA #invalidate closest cluster of the new merged cluster
-      
     
       
       #TODO: compute new representative points
