@@ -16,7 +16,7 @@ library(purrr)
 library(reshape)
 library(prettyR)
 library(parallelDist)
-
+library(RANN)
 
 
 
@@ -61,6 +61,69 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
+  
+  #Clustering part of the CURE algorithm (without sampling or partitioning)
+  CURE_cluster <- function(dataset, #data
+                           k) #number clusters
+  {
+    dataset$cluster <- 1:nrow(dataset) # each point is it's own cluster int he beginning
+    dataset$rep <- TRUE #every cluster it it's own representive point
+    dataset$closest <- NA # closest cluster to the cluster each point is in
+    dataset$dist <- NA # distance to closest cluster
+    addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
+    
+    dataset <- dataset[1:20 ,] #reduce size for debug
+  
+    nClusters <- nrow(table(dataset$cluster)) #number of current clusters
+    while(nClusters > k)
+    {
+      #compute for each cluster it's closest cluster
+      #for each representative point of a cluster, find nearest point of another cluster
+      #we need to do this first for each cluster before we can merge the two closest clusters
+      for(i in 1:length(unique(dataset$cluster)))
+      {
+        currentCluster <- unique(dataset$cluster)[i]
+        currentRep <- dataset[dataset$cluster == currentCluster & dataset$rep == TRUE,] # representative points of the current cluster
+      
+        #Klingt im Buch so, aber im Paper nicht.
+        pointsNotInCurrentCluster <- dataset[!(dataset$cluster == currentCluster),]
+        
+        #use kd-tree to find nearest point for each representative point
+        #TODO not sure if Kd-Tree really is a good idea here. It seems to me that the tree is build anew every time and I didn't find a way to keep it
+        nearest <- nn2(data = pointsNotInCurrentCluster[, !names(dataset) %in% addedCols],
+                       query = currentRep[, !names(dataset) %in% addedCols],
+                       k = 1)
+        
+        #extract closest point
+        idxClosestPoint <- nearest$nn.idx[ which(nearest$nn.dist %in% c(min(nearest$nn.dist))) ]
+        closestPoint <- pointsNotInCurrentCluster[idxClosestPoint,]
+        
+        #set closest cluster and distance
+        dataset[dataset$cluster == currentCluster, "closest"] <- closestPoint$cluster #closest cluster to this cluster
+        dataset[dataset$cluster == currentCluster, "dist"] <- min(nearest$nn.dist) # distance to closest cluster
+      }
+      
+      #merge the two closest clusters
+      clustersToMerge <- dataset[dataset$dist == min(dataset$dist),][1,][names(dataset) %in% c("cluster", "closest")]
+      dataset[dataset$cluster == clustersToMerge$closest, "cluster"] <- clustersToMerge$cluster #add points of closest cluster to cluster
+      dataset[dataset$closest == clustersToMerge$closest, "closest"] <- clustersToMerge$cluster #clusters that were closest to the cluster that was merged, are now closest to the new cluster
+      dataset[dataset$cluster == clustersToMerge$cluster, "closest"] <- NA #invalidate closest cluster of the new merged cluster
+      
+    
+      
+      #TODO: compute new representative points
+      
+      
+      View(dataset)
+      
+      nClusters <- nrow(table(dataset$cluster)) #update number of current clusters
+      nClusters <- k #remove this later, just for debugging
+    }
+    
+  
+    
+    #View(dataset)
+  }
   
   ### CURE algorithm
   CURE <- function(dataset,  # data
@@ -110,7 +173,7 @@ server <- function(input, output) {
     }
     dist_mat <- sapply(partitions[[1]], function(x){return(x)})
     
-    View(dist_mat)
+    #View(dist_mat)
     d <- parallelDist(dist_mat)
     # todo check structure of d, to get distances between points
     
@@ -133,7 +196,7 @@ server <- function(input, output) {
   df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
   Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
-  
+  CURE_cluster(df, 1)
    
    output$distPlot <- renderPlot({
       # generate bins based on input$bins from ui.R
