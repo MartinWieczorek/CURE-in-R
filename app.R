@@ -36,27 +36,37 @@ for (i in 1:num_attrib) {
   # TODO some kind of normalization (if enough time for this)
 }
 
-# Define UI for application that draws a histogram
-ui <- fluidPage(
-   
-   # Application title
-   titlePanel("Old Faithful Geyser Data"),
-   
-   # Sidebar with a slider input for number of bins 
-   sidebarLayout(
-      sidebarPanel(
-         sliderInput("bins",
-                     "Number of bins:",
-                     min = 1,
-                     max = 50,
-                     value = 30)
-      ),
-      
-      # Show a plot of the generated distribution
-      mainPanel(
-         plotOutput("distPlot")
-      )
-   )
+# Define UI for Add health Cure clustering
+ui <- dashboardPage(
+  dashboardHeader(title = "Add Health - CURE"),
+  dashboardSidebar(
+    sidebarMenu(
+      sliderInput(inputId = "k", label = "Number Cluster", min = 2, max = 20, value = 3, step = 1, round = TRUE),
+      sliderInput(inputId = "alpha", label = "alpha", min = 0, max = 1, value = 0.5),
+      sliderInput(inputId = "p", label = "Number of partitions", min = 0, max = 50, value = 5),
+      sliderInput(inputId = "f", label = "f", min = 0, max = 1, value = 0.5),
+      sliderInput(inputId = "delta", label = "delta", min = 0, max = 1, value = 0.5),
+      sliderInput(inputId = "q", label = "Cluster per partition", min = 0, max = 20, value = 7)
+    )
+  ),
+  dashboardBody(
+    fluidRow(
+      # output table
+      DT::dataTableOutput(outputId = "summaryTable")
+    ),
+    fluidRow(
+      # output table
+      plotOutput(outputId = "resPerYear")
+    ),
+    fluidRow(
+      # output table
+      plotOutput(outputId = "votePercent")
+    ),
+    fluidRow(
+      # output table
+      plotOutput(outputId = "typePercent")
+    )
+  )
 )
 
 # Define server logic required to draw a histogram
@@ -198,7 +208,7 @@ server <- function(input, output) {
   df <- as.data.frame(data_mat)
   df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
-  Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
+  #Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
   CURE_cluster(df, 5)
    
    output$distPlot <- renderPlot({
