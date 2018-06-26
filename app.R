@@ -12,6 +12,7 @@ library(shinydashboard)
 library(dplyr)
 library(DT)
 library(ggplot2)
+library(ggfortify)
 library(purrr)
 library(reshape)
 library(prettyR)
@@ -52,19 +53,7 @@ ui <- dashboardPage(
   dashboardBody(
     fluidRow(
       # output table
-      DT::dataTableOutput(outputId = "summaryTable")
-    ),
-    fluidRow(
-      # output table
-      plotOutput(outputId = "resPerYear")
-    ),
-    fluidRow(
-      # output table
-      plotOutput(outputId = "votePercent")
-    ),
-    fluidRow(
-      # output table
-      plotOutput(outputId = "typePercent")
+      plotOutput(outputId = "clusterPlot")
     )
   )
 )
@@ -211,13 +200,13 @@ server <- function(input, output) {
   #Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
   CURE_cluster(df, 5)
    
-   output$distPlot <- renderPlot({
-      # generate bins based on input$bins from ui.R
-      x    <- faithful[, 2] 
-      bins <- seq(min(x), max(x), length.out = input$bins + 1)
-      
-      # draw the histogram with the specified number of bins
-      hist(x, breaks = bins, col = 'darkgray', border = 'white')
+   output$clusterPlot <- renderPlot({
+     # dimension reduction
+     pca <- prcomp(df)
+     
+     #plotting
+     ggplot(data = pca, mapping = aes(x = pca$x[,1], y = pca$x[,2])) +
+       geom_point(data = df, color = 1, size = 1) # TODO color based on clustering result, and size is changed for representatives
    })
 }
 
