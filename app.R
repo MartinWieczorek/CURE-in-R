@@ -63,15 +63,18 @@ server <- function(input, output) {
   
   #Clustering part of the CURE algorithm (without sampling or partitioning)
   CURE_cluster <- function(dataset, #data
-                           k) #number clusters
+                           k, #number clusters
+                           numberRep # number of representative points per cluster
+                           ) 
   {
+    #adding some columns
     dataset$cluster <- 1:nrow(dataset) # each point is it's own cluster int he beginning
     dataset$rep <- TRUE #every cluster it it's own representive point
     dataset$closest <- NA # closest cluster to the cluster each point is in
     dataset$dist <- NA # distance to closest cluster
-    addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
     
-    dataset <- dataset[1:20 ,] #reduce size for debug
+    #other variables we will use
+    addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
   
     nClusters <- nrow(table(dataset$cluster)) #number of current clusters
     while(nClusters > k)
@@ -93,14 +96,13 @@ server <- function(input, output) {
         pointsNotInCurrentCluster <- dataset[!(dataset$cluster == currentCluster) & dataset$rep == TRUE,]
         
         #use kd-tree to find nearest point for each representative point
-        #TODO not sure if Kd-Tree really is a good idea here. It seems to me that the tree is build anew every time and I didn't find a way to keep it
         nearest <- nn2(data = pointsNotInCurrentCluster[, !names(dataset) %in% addedCols],
                        query = currentRep[, !names(dataset) %in% addedCols],
                        k = 1)
         
         #extract closest point
         idxClosestPoint <- nearest$nn.idx[ which(nearest$nn.dist %in% c(min(nearest$nn.dist))) ]
-        closestPoint <- pointsNotInCurrentCluster[idxClosestPoint,]
+        closestPoint <- pointsNotInCurrentCluster[idxClosestPoint,][1,]
         
         #set closest cluster and distance
         dataset[dataset$cluster == currentCluster, "closest"] <- closestPoint$cluster #closest cluster to this cluster
@@ -113,18 +115,65 @@ server <- function(input, output) {
       dataset[dataset$closest == clustersToMerge$closest, "closest"] <- NA #invalidate closest cluster of clusters that had the cluster that was merged as closest cluster 
       dataset[dataset$cluster == clustersToMerge$cluster, "closest"] <- NA #invalidate closest cluster of the new merged cluster
     
+      #compute new representative points for new merged cluster
+      oldRepPoints <- dataset[dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE,]
+      rowIdxOfOldRepPoints <- which(dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE)
       
-      #TODO: compute new representative points
-      
-    
-      
+      #don't compute new representative points if all points in the cluster will end up as representative points
+      if(nrow(oldRepPoints) > numberRep) 
+      {
+        dataset[dataset$cluster == clustersToMerge$cluster, "rep"] <- FALSE #invalidate old representative points
+        
+        #compute centroid
+        centroid <- as.data.frame(colMeans(dataset[dataset$cluster == clustersToMerge$cluster, !names(dataset) %in% addedCols]))
+        #we have to reshape the data. The centroid should be representated by a single row, as all the other points
+        colnames(centroid) <- c("value")
+        centroid$attribute <- rownames(centroid)
+        newCentroid <- tidyr::spread(data = centroid, attribute, value)
+        centroid <- newCentroid[,centroid$attribute] #reorder columns, because spread orders them alphabetically
+        
+        #compute distances
+        oldRepPoints <- rbind(oldRepPoints[, !names(dataset) %in% addedCols], centroid) #add centroid because we need distance of all points to centroid 
+        d <- parallelDist(as.matrix(oldRepPoints), diag = TRUE, upper = TRUE)
+        distMat <- as.data.frame(as.matrix(d))
+        oldRepPoints <- oldRepPoints[-nrow(oldRepPoints),] #remove centroid
+        
+        #find new representative points. Mostly done as in the pseudocode of the paper
+        newRepPointsIdx <- NULL
+        for(i in 1:numberRep)
+        {
+          maxDist <- 0
+          maxPointIdx <- NULL
+          for(j in 1:nrow(oldRepPoints))
+          {
+            if(i == 1)
+            {
+              #first new representative point is farthest from centroid
+              distancesToCentroid <- distMat[nrow(distMat), -ncol(distMat)] #distances from all old representative points to centroid
+              newRepPointsIdx <- c(which(max(distancesToCentroid) == distancesToCentroid)[1])
+              distMat <- distMat[-nrow(distMat),-ncol(distMat)] #remove distances to centroid
+              break
+            }
+            else
+            {
+              distToRepPoints <- distMat[j, newRepPointsIdx] #only distances to the other newly chosen representative points
+              minDist <- min(distToRepPoints)
+            }
+            if(minDist >= maxDist)
+            {
+              maxDist <- minDist
+              maxPointIdx <- j
+            }
+          }
+          newRepPointsIdx <- c(newRepPointsIdx, maxPointIdx) #add newly found representative point
+        }
+        
+        #set all newly found representative points as represetative points in the dataset
+        dataset[rowIdxOfOldRepPoints[newRepPointsIdx], "rep"] <- TRUE 
+      }
       nClusters <- nrow(table(dataset$cluster)) #update number of current clusters
-     # nClusters <- k #remove this later, just for debugging
     }
-    
-  
-    
-    View(dataset)
+    return(dataset)
   }
   
   ### CURE algorithm
@@ -198,7 +247,8 @@ server <- function(input, output) {
   df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
   #Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
-  CURE_cluster(df, 5)
+  CURE_cluster(df, 5, 3)
+  str("finished")
    
    output$clusterPlot <- renderPlot({
      # dimension reduction
