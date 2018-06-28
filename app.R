@@ -64,8 +64,13 @@ server <- function(input, output) {
   #Clustering part of the CURE algorithm (without sampling or partitioning)
   CURE_cluster <- function(dataset, #data
                            k, #number clusters
-                           numberRep # number of representative points per cluster
-                           ) 
+                           numberRep, # number of representative points per cluster
+                           alpha, # factor (0 - 1)
+                           p,     # number of partitions (>1)
+                           f,     # sampling fraction (0 - 1)
+                           delta, # 1-delta is the probability of sampling at least f*100% points of each cluster (0-1)
+                           q      # number of clusters that should be found in a partition -> number of clusters equals 1/q of the original partition size (>1)
+  ) 
   {
     #adding some columns
     dataset$cluster <- 1:nrow(dataset) # each point is it's own cluster int he beginning
@@ -76,6 +81,39 @@ server <- function(input, output) {
     #other variables we will use
     addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
   
+    # calculate sample size
+    N <- length(dataset[[1]]) # TODO adjust to data
+    Ni <- N/k #TODO evaluate if this function could fit (probably Ni has to be smaller)
+    inv_delta <- 1/delta
+    sample_size <- f*N + N/Ni * log(inv_delta) + N/Ni * sqrt(log(inv_delta)*log(inv_delta) + 2*f*Ni*log(inv_delta))
+    
+    # take a random sample of size sample_size from the dataset
+    sampleSet <- sample(1:nrow(dataset), as.integer(sample_size), replace=FALSE)
+    data_sample <- dataset[sampleSet,] 
+    
+    # split sample into p equally sized partitions
+    partitionsSize <- as.integer(length(sampleSet) / p)
+    partitions <- list()
+    for (i in 1:p) {
+      if (i == p ){
+        partitions[[i]] <- data_sample
+        data_sample <- NULL
+        break()
+      }
+      sampleSet <- sample(1:nrow(data_sample), as.integer(partitionsSize), replace=FALSE)
+      partitions[[i]] <- data_sample[sampleSet,]
+      data_sample <- data_sample[-sampleSet,]
+    }
+    
+    # TODO: do clustering first for each partition
+    # and afterwards for the outcome of all partitions together to speed up everything
+    clusters_per_partition <- partitionsSize / q
+    
+    # test for one partition
+    #dataset <- partitions[[1]]
+    
+    
+    
     nClusters <- nrow(table(dataset$cluster)) #number of current clusters
     while(nClusters > k)
     {
@@ -246,8 +284,8 @@ server <- function(input, output) {
   df <- as.data.frame(data_mat)
   df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
-  #Clustering <- CURE(df, 3, 0.3, 4, 0.2, 0.3, 7)
-  CURE_cluster(df, 5, 3)
+  #            data, num_clulster, num_reps, alpha, num_partition, sampling fraction, delta, q 
+  clusters <- CURE_cluster(df, 5, 3, 0.3, 10, 0.2, 0.3, 5)
   str("finished")
    
    output$clusterPlot <- renderPlot({
