@@ -217,14 +217,20 @@ server <- function(input, output) {
     
     #cluster each partition
     clusters_per_partition <- partitionsSize / q
+    partitions_combined <- NULL
     for(i in 1:length(partitions))
     {
       partitions[[i]] <- CURE_cluster(dataset = partitions[[i]],
                                       k = clusters_per_partition,
                                       numberRep = num_reps)
+      partitions_combined <- rbind(partitions_combined, partitions[[i]])
     }
-   
     
+    #combine partitions
+    partitions_combined[,"closest"] <- NA #forget every closest cluster
+    partitions_combined <- CURE_cluster(partitions_combined,
+                                    k,
+                                    num_reps)
   }
   
   # convert to matrix
