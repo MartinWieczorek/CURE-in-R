@@ -192,13 +192,16 @@ server <- function(input, output) {
     
     # take a random sample of size n from a dataset
     sampleSet <- sample(1:nrow(dataset), as.integer(sample_size), replace=FALSE)
-    mysample <- dataset[sampleSet,] 
+    initial_sampleSet <- sampleSet
+    mysample <- dataset[sampleSet,]
     
     #adding some columns to sample
     mysample$cluster <- 1:nrow(mysample) # each point is it's own cluster int he beginning
     mysample$rep <- TRUE #every cluster it it's own representive point
     mysample$closest <- NA # closest cluster to the cluster each point is in
     mysample$dist <- NA # distance to closest cluster
+    addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
+    
     
     # split sample into p equally sized partitions
     partitionsSize <- as.integer(length(sampleSet) / p)
@@ -231,6 +234,31 @@ server <- function(input, output) {
     partitions_combined <- CURE_cluster(partitions_combined,
                                     k,
                                     num_reps)
+    
+    #we still have to assign each of the remaining points that were not in the initial sample to the clusters
+    dataset <- dataset[-initial_sampleSet,] #points that were not assigned to any cluster yet
+  
+    #for each point that was not in the initial sample search closest representative point
+    haystack <- partitions_combined[partitions_combined$rep == TRUE,]
+    nearest <- nn2(data = haystack[, !names(partitions_combined) %in% addedCols],
+                     query = dataset,
+                     k = 1)
+    
+    #extract closest representative points and assign the remaining points to the cluster the closest point belongs to
+    closestPoints <- haystack[nearest$nn.idx,]
+    dataset$cluster <- closestPoints$cluster
+    
+    #all points are assigned to a cluster now. 
+    #Since We reduced the dataset to points that were not in the inital sample earlier, 
+    #we now have to re-add the points that were in the initial sample to the dataset
+    #for that we first need to add the remaining columns to the dataset
+    dataset$rep <- FALSE
+    dataset$closest <- NA
+    dataset$dist <- NA
+    
+    #then we can add the points that were in the initial sample to the dataset
+    dataset <- rbind(dataset, partitions_combined)
+    
   }
   
   # convert to matrix
