@@ -48,7 +48,7 @@ ui <- dashboardPage(
       sliderInput(inputId = "p", label = "Number of partitions", min = 1, max = 50, value = 20),
       sliderInput(inputId = "f", label = "f", min = 0, max = 1, value = 0.1),
       sliderInput(inputId = "delta", label = "delta", min = 0, max = 1, value = 0.7),
-      sliderInput(inputId = "q", label = "q", min = 0, max = 20, value = 5)
+      sliderInput(inputId = "q", label = "q", min = 1, max = 20, value = 5)
     )
   ),
   dashboardBody(
