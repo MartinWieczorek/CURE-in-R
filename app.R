@@ -64,12 +64,20 @@ server <- function(input, output) {
   #Clustering part of the CURE algorithm (without sampling or partitioning)
   CURE_cluster <- function(dataset, #data
                            k, #number of clusters
-                           numberRep # number of representative points per cluster
+                           numberRep, # number of representative points per cluster,
+                           alpha, #factor (0 - 1)
+                           centers
   ) 
   {
-    
     #other variables we will use
     addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
+    
+    #if centers don't exist yet, create it. In the beginning each point is it's own center
+    if(!is.data.frame(centers))
+    {
+      centers <- dataset[, !names(dataset) %in% c("rep", "closest", "dist")] #centroids of each cluster
+    }
+    
     
     #start clustering
     nClusters <- nrow(table(dataset$cluster)) #number of current clusters
@@ -110,23 +118,27 @@ server <- function(input, output) {
       dataset[dataset$cluster == clustersToMerge$closest, "cluster"] <- clustersToMerge$cluster #add points of closest cluster to cluster
       dataset[dataset$closest == clustersToMerge$closest, "closest"] <- NA #invalidate closest cluster of clusters that had the cluster that was merged as closest cluster 
       dataset[dataset$cluster == clustersToMerge$cluster, "closest"] <- NA #invalidate closest cluster of the new merged cluster
-    
+      centers <- centers[!(centers$cluster == clustersToMerge$closest),] #remove centroids of clusters that don't exist anymore
+      
       #compute new representative points for new merged cluster
       oldRepPoints <- dataset[dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE,]
       rowIdxOfOldRepPoints <- which(dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE)
+      
+      dist <- as.numeric(dataset[dataset$cluster == clustersToMerge$cluster, "dist"])
+      
+      #compute centroid
+      centroid <- as.data.frame(colMeans(dataset[dataset$cluster == clustersToMerge$cluster, !names(dataset) %in% addedCols]))
+      #we have to reshape the centroid data. The centroid should be representated by a single row, as all the other points
+      colnames(centroid) <- c("value")
+      centroid$attribute <- rownames(centroid)
+      newCentroid <- tidyr::spread(data = centroid, attribute, value)
+      centroid <- newCentroid[,centroid$attribute] #reorder columns, because spread orders them alphabetically
+      centers[centers$cluster == clustersToMerge$cluster, !names(centers)  %in% c("cluster")] <- centroid #update centroid in centers
       
       #don't compute new representative points if all points in the cluster will end up as representative points
       if(nrow(oldRepPoints) > numberRep) 
       {
         dataset[dataset$cluster == clustersToMerge$cluster, "rep"] <- FALSE #invalidate old representative points
-        
-        #compute centroid
-        centroid <- as.data.frame(colMeans(dataset[dataset$cluster == clustersToMerge$cluster, !names(dataset) %in% addedCols]))
-        #we have to reshape the data. The centroid should be representated by a single row, as all the other points
-        colnames(centroid) <- c("value")
-        centroid$attribute <- rownames(centroid)
-        newCentroid <- tidyr::spread(data = centroid, attribute, value)
-        centroid <- newCentroid[,centroid$attribute] #reorder columns, because spread orders them alphabetically
         
         #compute distances
         oldRepPoints <- rbind(oldRepPoints[, !names(dataset) %in% addedCols], centroid) #add centroid because we need distance of all points to centroid 
@@ -166,10 +178,14 @@ server <- function(input, output) {
         
         #set all newly found representative points as represetative points in the dataset
         dataset[rowIdxOfOldRepPoints[newRepPointsIdx], "rep"] <- TRUE 
+      
       }
       nClusters <- nrow(table(dataset$cluster)) #update number of current clusters
     }
-    return(dataset)
+    returnVal <- list()
+    returnVal$dataset <- dataset
+    returnVal$centers <- centers
+    return(returnVal)
   }
   
   ### CURE algorithm
@@ -221,19 +237,28 @@ server <- function(input, output) {
     #cluster each partition
     clusters_per_partition <- partitionsSize / q
     partitions_combined <- NULL
+    centers_combined <- NULL
     for(i in 1:length(partitions))
     {
-      partitions[[i]] <- CURE_cluster(dataset = partitions[[i]],
-                                      k = clusters_per_partition,
-                                      numberRep = num_reps)
-      partitions_combined <- rbind(partitions_combined, partitions[[i]])
+      result <- CURE_cluster(dataset = partitions[[i]],
+                                k = clusters_per_partition,
+                                numberRep = num_reps,
+                                alpha = alpha,
+                                centers = NA)
+      
+      centers_combined <- rbind(centers_combined, result[["centers"]])
+      partitions_combined <- rbind(partitions_combined, result[["dataset"]])
     }
     
     #combine partitions
     partitions_combined[,"closest"] <- NA #forget every closest cluster
-    partitions_combined <- CURE_cluster(partitions_combined,
+    result <- CURE_cluster(partitions_combined,
                                     k,
-                                    num_reps)
+                                    num_reps,
+                                    alpha,
+                                    centers_combined)
+    partitions_combined <- result[["dataset"]]
+    centers_combined <- result[["centers"]]
     
     #we still have to assign each of the remaining points that were not in the initial sample to the clusters
     dataset <- dataset[-initial_sampleSet,] #points that were not assigned to any cluster yet
