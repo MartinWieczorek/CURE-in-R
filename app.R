@@ -298,6 +298,14 @@ server <- function(input, output) {
       partitions_combined <- rbind(partitions_combined, result[["dataset"]])
     }
     
+    #outlier handling #2
+    #remove small clusters
+    count <- as.data.frame(table(partitions_combined$cluster))
+    clustersToRemove <- count[count[,2] < 6, 1]
+    
+    partitions_combined <- partitions_combined[!partitions_combined$cluster %in% clustersToRemove,] #remove found outliers
+    centers_combined <- centers_combined[!centers_combined$cluster %in% clustersToRemove,] #remove centroids of found outliers
+    
     #combine partitions
     partitions_combined[,"closest"] <- NA #forget every closest cluster
     print("clustering partitions ...")
