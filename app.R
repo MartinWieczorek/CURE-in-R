@@ -114,8 +114,30 @@ server <- function(input, output) {
         dataset[dataset$cluster == currentCluster, "dist"] <- min(nearest$nn.dist) # distance to closest cluster
       }
       
-      #merge the two closest clusters
+      #clusters that should be merged
       clustersToMerge <- dataset[dataset$dist == min(dataset$dist),][1,][names(dataset) %in% c("cluster", "closest")]
+      
+      #before we merge the two clusters we have to move the representative points of the two clusters away from their respective centroid
+      #this is necessary because after the merge we only use the old representative points of both clusters to compute new reresentative points as proposed in the paper
+      #the new representative points of the merged cluster will then be moved towards the new centroid
+      idx <- which(dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE) #for the first cluster
+      for(i in idx)
+      {
+        p <- dataset[i, !names(dataset) %in% addedCols]
+        centroid <- centers[centers$cluster == clustersToMerge$cluster, !names(centers) %in% c("cluster")]
+        newP <- p - alpha * (centroid - p)
+        dataset[i, !names(dataset) %in% addedCols] <- newP
+      }
+      idx <- which(dataset$cluster == clustersToMerge$closest & dataset$rep == TRUE) #for the second cluster
+      for(i in idx)
+      {
+        p <- dataset[i, !names(dataset) %in% addedCols]
+        centroid <- centers[centers$cluster == clustersToMerge$closest, !names(centers) %in% c("cluster")]
+        newP <- p - alpha * (centroid - p)
+        dataset[i, !names(dataset) %in% addedCols] <- newP
+      }
+      
+      #merge the two closest clusters
       dataset[dataset$cluster == clustersToMerge$closest, "cluster"] <- clustersToMerge$cluster #add points of closest cluster to cluster
       dataset[dataset$closest == clustersToMerge$closest, "closest"] <- NA #invalidate closest cluster of clusters that had the cluster that was merged as closest cluster 
       dataset[dataset$cluster == clustersToMerge$cluster, "closest"] <- NA #invalidate closest cluster of the new merged cluster
@@ -124,8 +146,6 @@ server <- function(input, output) {
       #compute new representative points for new merged cluster
       oldRepPoints <- dataset[dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE,]
       rowIdxOfOldRepPoints <- which(dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE)
-      
-      dist <- as.numeric(dataset[dataset$cluster == clustersToMerge$cluster, "dist"])
       
       #compute centroid
       centroid <- as.data.frame(colMeans(dataset[dataset$cluster == clustersToMerge$cluster, !names(dataset) %in% addedCols]))
@@ -181,6 +201,16 @@ server <- function(input, output) {
         dataset[rowIdxOfOldRepPoints[newRepPointsIdx], "rep"] <- TRUE 
       
       }
+      
+      #shrink representative points towards centroid
+      idx <- which(dataset$cluster == clustersToMerge$cluster & dataset$rep == TRUE)
+      for(i in idx)
+      {
+        p <- dataset[i, !names(dataset) %in% addedCols]
+        newP <- p + alpha * (centroid - p)
+        dataset[i, !names(dataset) %in% addedCols] <- newP
+      }
+      
       nClusters <- nrow(table(dataset$cluster)) #update number of current clusters
     }
     returnVal <- list()
