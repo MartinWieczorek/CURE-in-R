@@ -18,6 +18,7 @@ library(reshape)
 library(prettyR)
 library(parallelDist)
 library(RANN)
+library(cluster)
 
 
 
@@ -283,6 +284,19 @@ server <- function(input, output) {
     
     #then we can add the points that were in the initial sample to the dataset
     dataset <- rbind(dataset, partitions_combined)
+    
+    #reshape for final output
+    dataset$closest <- NULL
+    dataset$dist <- NULL
+    
+    returnVal <- list()
+    returnVal$data <- dataset
+    returnVal$cluster <- dataset$cluster
+    returnVal$centers <- centers_combined
+
+    returnVal$silinfo <- silhouette(returnVal$cluster, dist(dataset[, !names(dataset) %in% addedCols]))[, 3]
+    
+    return(returnVal)
     
   }
   
