@@ -43,12 +43,12 @@ ui <- dashboardPage(
   dashboardHeader(title = "Add Health - CURE"),
   dashboardSidebar(
     sidebarMenu(
-      sliderInput(inputId = "k", label = "Number Cluster", min = 2, max = 20, value = 3, step = 1, round = TRUE),
-      sliderInput(inputId = "alpha", label = "alpha", min = 0, max = 1, value = 0.5),
-      sliderInput(inputId = "p", label = "Number of partitions", min = 0, max = 50, value = 5),
-      sliderInput(inputId = "f", label = "f", min = 0, max = 1, value = 0.5),
-      sliderInput(inputId = "delta", label = "delta", min = 0, max = 1, value = 0.5),
-      sliderInput(inputId = "q", label = "Cluster per partition", min = 0, max = 20, value = 7)
+      sliderInput(inputId = "k", label = "Number Cluster", min = 2, max = 20, value = 6, step = 1, round = TRUE),
+      sliderInput(inputId = "alpha", label = "alpha", min = 0, max = 1, value = 0.6),
+      sliderInput(inputId = "p", label = "Number of partitions", min = 1, max = 50, value = 20),
+      sliderInput(inputId = "f", label = "f", min = 0, max = 1, value = 0.1),
+      sliderInput(inputId = "delta", label = "delta", min = 0, max = 1, value = 0.7),
+      sliderInput(inputId = "q", label = "q", min = 0, max = 20, value = 5)
     )
   ),
   dashboardBody(
@@ -271,6 +271,7 @@ server <- function(input, output) {
     centers_combined <- NULL
     for(i in 1:length(partitions))
     {
+      print(sprintf("processing partition: %d", i))
       result <- CURE_cluster(dataset = partitions[[i]],
                                 k = clusters_per_partition,
                                 numberRep = num_reps,
@@ -283,6 +284,7 @@ server <- function(input, output) {
     
     #combine partitions
     partitions_combined[,"closest"] <- NA #forget every closest cluster
+    print("clustering partitions ...")
     result <- CURE_cluster(partitions_combined,
                                     k,
                                     num_reps,
@@ -292,6 +294,7 @@ server <- function(input, output) {
     centers_combined <- result[["centers"]]
     
     #we still have to assign each of the remaining points that were not in the initial sample to the clusters
+    print("labeling unsampled data ...")
     dataset <- dataset[-initial_sampleSet,] #points that were not assigned to any cluster yet
   
     #for each point that was not in the initial sample search closest representative point
@@ -338,9 +341,6 @@ server <- function(input, output) {
   df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
   #            data, num_cluster, num_reps, alpha, num_partition, sampling fraction, delta, q 
-  
-
-   
    output$clusterPlot <- renderPlot({
      clusters <- CURE(dataset = df,
                       k = input$k,
@@ -353,11 +353,14 @@ server <- function(input, output) {
      
      
      # dimension reduction
-     pca <- prcomp(df)
+     cluster_data <- clusters$data
+     drops <- c("rep","cluster")
+     cluster_data <- cluster_data[, !(names(cluster_data) %in% drops)]
+     pca <- prcomp(cluster_data)
      
      #plotting
      ggplot(data = pca, mapping = aes(x = pca$x[,1], y = pca$x[,2])) +
-       geom_point(data = df, color = 1, size = 1) # TODO color based on clustering result, and size is changed for representatives
+       geom_point(data = df, color = clusters$cluster, size = map_dbl(clusters$data$rep, function(x){ifelse(x == TRUE, return(5), return(2))}))
    })
 }
 
