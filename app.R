@@ -360,7 +360,7 @@ server <- function(input, output) {
      
      #plotting
      ggplot(data = pca, mapping = aes(x = pca$x[,1], y = pca$x[,2])) +
-       geom_point(data = df, color = clusters$cluster, size = map_dbl(clusters$data$rep, function(x){ifelse(x == TRUE, return(5), return(2))}))
+       geom_point(color = clusters$cluster, size = map_dbl(clusters$data$rep, function(x){ifelse(x == TRUE, return(5), return(2))}))
    })
 }
 
