@@ -70,6 +70,7 @@ server <- function(input, output) {
                            centers
   ) 
   {
+    
     #other variables we will use
     addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
     
@@ -79,11 +80,26 @@ server <- function(input, output) {
       centers <- dataset[, !names(dataset) %in% c("rep", "closest", "dist")] #centroids of each cluster
     }
     
+    handle_outliers <- TRUE
+    outlier_fraction <- 1/3 #when only (outlier_fraction*initial clusters) clusters are left, handle outliers
     
     #start clustering
     nClusters <- nrow(table(dataset$cluster)) #number of current clusters
     while(nClusters > k)
     {
+      
+      #outlier handling #1
+      if(handle_outliers & nClusters < outlier_fraction * nrow(dataset))
+      {
+        handle_outliers <- FALSE
+        count <- as.data.frame(table(dataset$cluster))
+        clustersToRemove <- count[count[,2] < 2, 1]
+        
+        dataset <- dataset[!dataset$cluster %in% clustersToRemove,] #remove found outliers
+        centers <- centers[!centers$cluster %in% clustersToRemove,] #remove centroids of found outliers
+      }
+      
+      
       #compute for each cluster it's closest cluster
       #for each representative point of a cluster, find nearest point of another cluster
       #we need to do this first for each cluster before we can merge the two closest clusters
