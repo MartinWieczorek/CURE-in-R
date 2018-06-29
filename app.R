@@ -70,7 +70,10 @@ server <- function(input, output) {
                            centers
   ) 
   {
-    
+    if(k < 1)
+    {
+      k <- 1
+    }
     #other variables we will use
     addedCols <- c("cluster", "rep", "closest", "dist") # list of columns we added, and need to remove before we compute distances etc.
     
@@ -246,7 +249,6 @@ server <- function(input, output) {
                    q      # number of clusters that should be found in a partition -> number of clusters equals 1/q of the original partition size (>1)
                    )
   {
-    
     N <- length(dataset[[1]]) # TODO adjust to data
     #print(N)
     Ni <- N/k #TODO evaluate if this function could fit (probably Ni has to be smaller)
@@ -300,8 +302,9 @@ server <- function(input, output) {
     
     #outlier handling #2
     #remove small clusters
+    threshold <- 6 #not sure how to choose this value
     count <- as.data.frame(table(partitions_combined$cluster))
-    clustersToRemove <- count[count[,2] < 6, 1]
+    clustersToRemove <- count[count[,2] < threshold, 1]
     
     partitions_combined <- partitions_combined[!partitions_combined$cluster %in% clustersToRemove,] #remove found outliers
     centers_combined <- centers_combined[!centers_combined$cluster %in% clustersToRemove,] #remove centroids of found outliers
@@ -350,7 +353,7 @@ server <- function(input, output) {
     returnVal$data <- dataset
     returnVal$cluster <- dataset$cluster
     returnVal$centers <- centers_combined
-
+    
     returnVal$silinfo <- silhouette(returnVal$cluster, dist(dataset[, !names(dataset) %in% addedCols]))[, 3]
     
     return(returnVal)
