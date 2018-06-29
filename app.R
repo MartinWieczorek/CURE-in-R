@@ -100,6 +100,9 @@ server <- function(input, output) {
         
         dataset <- dataset[!dataset$cluster %in% clustersToRemove,] #remove found outliers
         centers <- centers[!centers$cluster %in% clustersToRemove,] #remove centroids of found outliers
+        
+        nClusters <- nrow(table(dataset$cluster)) #number of current clusters
+        next #we might have < k clusters now
       }
       
       
@@ -270,6 +273,7 @@ server <- function(input, output) {
     
     # split sample into p equally sized partitions
     partitionsSize <- as.integer(length(sampleSet) / p)
+    
     #print(partitionsSize)
     partitions <- list()
     for (i in 1:p) {
@@ -387,13 +391,13 @@ server <- function(input, output) {
      
      #plotting
      ggplot(data = pca, mapping = aes(x = pca$x[,1], y = pca$x[,2])) +
-       geom_point(aes(color = as.factor(clusters$cluster), 
+       geom_point(aes(color = as.factor(clusters$cluster),
                       size = as.factor(map_dbl(
                             clusters$data$rep, 
                             function(x){ifelse(x == TRUE, return(5), return(2))}))
                       )
-                  )
-
+                 )
+                  
    })
 }
 
