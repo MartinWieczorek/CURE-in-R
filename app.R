@@ -338,17 +338,20 @@ server <- function(input, output) {
   df[is.na(df)] <- 0 # TODO check if NA <- 0 makes sense
   
   #            data, num_cluster, num_reps, alpha, num_partition, sampling fraction, delta, q 
-  clusters <- CURE(dataset = df,
-                   k = 5,
-                   num_reps = 10,
-                   alpha = 0.3,
-                   p = 10,
-                   f = 0.2,
-                   delta = 0.3,
-                   q = 5)
-  str("finished")
+  
+
    
    output$clusterPlot <- renderPlot({
+     clusters <- CURE(dataset = df,
+                      k = input$k,
+                      num_reps = 10,
+                      alpha = input$alpha,
+                      p = input$p,
+                      f = input$f,
+                      delta = input$delta,
+                      q = input$q)
+     
+     
      # dimension reduction
      pca <- prcomp(df)
      
